@@ -1,0 +1,6 @@
+import { login } from "./actions";
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const params = await searchParams;
+  return <main className="min-h-screen grid place-items-center p-6"><form action={login} className="panel w-full max-w-sm rounded-3xl p-7"><div className="mb-7"><p className="text-xs uppercase tracking-[.22em] text-violet-300">Sales Intelligence</p><h1 className="mt-2 text-2xl font-semibold">Connexion privée</h1><p className="mt-2 text-sm text-white/45">Les données commerciales restent invisibles sans session autorisée.</p></div>{params.error && <p className="mb-4 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200">Identifiants invalides.</p>}<label className="text-xs text-white/50">E-mail</label><input name="email" type="email" required className="mt-2 mb-4 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-violet-400/50"/><label className="text-xs text-white/50">Mot de passe</label><input name="password" type="password" required className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 outline-none focus:border-violet-400/50"/><button className="mt-6 w-full rounded-xl bg-white px-4 py-2.5 font-medium text-black hover:bg-white/90">Se connecter</button></form></main>;
+}
