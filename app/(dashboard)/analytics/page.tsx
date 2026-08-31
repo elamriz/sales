@@ -41,8 +41,8 @@ export default async function Analytics(){
       <StatCard label="Panier moyen" value={eur(x.aov)}/>
       <StatCard label="Taux de réachat" value={`${(x.repurchaseRate*100).toFixed(1)} %`}/>
       <StatCard label="Reviews encore ouvertes" value={String(x.reviews)}/>
-      <StatCard label="CA paiement inconnu" value={eur(unknown?.revenue||0)} hint={`${((unknown?.share||0)*100).toFixed(1)} % du CA`}/>
-      <StatCard label="1er moyen de paiement" value={topPayment?.method||"—"} hint={topPayment?`${(topPayment.share*100).toFixed(1)} % du CA`:undefined}/>
+      <StatCard label="CA paiement inconnu" value={eur(unknown?.revenue||0)} note={`${((unknown?.share||0)*100).toFixed(1)} % du CA`}/>
+      <StatCard label="1er moyen de paiement" value={topPayment?.method||"—"} note={topPayment?`${(topPayment.share*100).toFixed(1)} % du CA`:undefined}/>
       <StatCard label="Délai moyen avant 2e commande" value={delays.length?`${avgDelay.toFixed(1)} jours`:"—"}/>
     </div>
 
