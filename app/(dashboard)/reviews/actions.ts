@@ -1,4 +1,61 @@
-"use server"; import { revalidatePath } from "next/cache"; import { createClient } from "@/lib/supabase/server";
-async function auth(){const s=await createClient();const {data}=await s.auth.getClaims();if(!data?.claims?.sub)throw new Error("Unauthorized");return {s,user:String(data.claims.sub)};}
-export async function approve(formData:FormData){const id=String(formData.get("id"));const {s,user}=await auth();const {data:old}=await s.from("sales_episodes").select("classification,status,total").eq("id",id).single();await s.from("manual_decisions").insert({episode_id:id,user_id:user,previous_classification:old?.classification,new_classification:"confirmed",previous_status:old?.status,new_status:"confirmed",note:"Approved from dashboard"});await s.from("sales_episodes").update({classification:"confirmed",status:"confirmed",review_required:false,revenue_eligible:old?.total!=null,manually_overridden:true}).eq("id",id);await s.from("review_queue").update({status:"approved",reviewer_user_id:user,reviewed_at:new Date().toISOString()}).eq("entity_id",id).eq("status","pending");revalidatePath("/reviews");revalidatePath("/overview");}
-export async function reject(formData:FormData){const id=String(formData.get("id"));const {s,user}=await auth();const {data:old}=await s.from("sales_episodes").select("classification,status").eq("id",id).single();await s.from("manual_decisions").insert({episode_id:id,user_id:user,previous_classification:old?.classification,new_classification:"not_sale",previous_status:old?.status,new_status:"not_sale",note:"Rejected from dashboard"});await s.from("sales_episodes").update({classification:"not_sale",status:"not_sale",review_required:false,revenue_eligible:false,manually_overridden:true}).eq("id",id);await s.from("review_queue").update({status:"rejected",reviewer_user_id:user,reviewed_at:new Date().toISOString()}).eq("entity_id",id).eq("status","pending");revalidatePath("/reviews");revalidatePath("/overview");}
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getAdminState } from "@/lib/admin";
+
+async function adminCode() {
+  const state = await getAdminState();
+  if (!state.unlocked || !state.code) redirect("/admin");
+  return state.code;
+}
+
+function amountFrom(formData: FormData) {
+  const raw = String(formData.get("amount") || "").replace(",", ".").trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) throw new Error("Montant invalide");
+  return n;
+}
+
+async function refresh() {
+  revalidatePath("/reviews");
+  revalidatePath("/overview");
+  revalidatePath("/sales");
+  revalidatePath("/analytics");
+  revalidatePath("/customers");
+}
+
+export async function saveAmount(formData: FormData) {
+  const code = await adminCode();
+  const id = String(formData.get("id") || "");
+  const amount = amountFrom(formData);
+  if (amount == null) throw new Error("Montant requis");
+  const s = await createClient();
+  const { error } = await s.rpc("admin_set_review_amount", { p_code: code, p_episode_id: id, p_amount: amount });
+  if (error) throw error;
+  await refresh();
+}
+
+async function resolve(formData: FormData, action: "approve_revenue"|"approve_no_revenue"|"reject") {
+  const code = await adminCode();
+  const id = String(formData.get("id") || "");
+  const amount = amountFrom(formData);
+  const note = String(formData.get("note") || "").trim() || null;
+  if (action === "approve_revenue" && amount == null) throw new Error("Indique un montant avant de valider dans le CA");
+  const s = await createClient();
+  const { error } = await s.rpc("admin_resolve_review", {
+    p_code: code,
+    p_episode_id: id,
+    p_action: action,
+    p_amount: amount,
+    p_note: note,
+  });
+  if (error) throw error;
+  await refresh();
+}
+
+export async function approveRevenue(formData: FormData) { await resolve(formData, "approve_revenue"); }
+export async function approveNoRevenue(formData: FormData) { await resolve(formData, "approve_no_revenue"); }
+export async function reject(formData: FormData) { await resolve(formData, "reject"); }
